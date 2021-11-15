@@ -1,6 +1,6 @@
 import torchvision as torchvision
 
-total_steps = 8*2e6
+total_steps = 4*8*2e6
 num_envs = 32
 num_levels = 10
 num_steps = 256
@@ -10,7 +10,7 @@ eps = .2
 grad_eps = .5
 value_coef = .5
 entropy_coef = .01
-grayscale = True
+grayscale = False
 
 feature_dim = 64
 # Clamp function just in case:
