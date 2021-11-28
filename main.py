@@ -1,11 +1,11 @@
 import torchvision as torchvision
 
-total_steps = 4*8*2e6
+total_steps = 25e6
 num_envs = 32
-num_levels = 10
+num_levels = 200 # 10 #200
 num_steps = 256
 num_epochs = 3
-batch_size = 512
+batch_size = 8 #512 #8
 eps = .2
 grad_eps = .5
 value_coef = .5
@@ -29,18 +29,53 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
+class Residual(nn.Module):
+    def __init__(self, in_channels, depth):
+        super(Residual, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, depth, 3, padding=1)
+        self.conv2 = nn.Conv2d(depth, depth, 3, padding=1)
+
+    def forward(self, x):
+        out = F.relu(x)
+        out = F.relu(self.conv1(out))
+        out = F.relu(self.conv2(out))
+        return x + out
+
+
+class ConvSequence(nn.Module):
+    def __init__(self, in_channels, depth):
+        super(ConvSequence, self).__init__()
+        self.conv = nn.Conv2d(in_channels, depth, 3, padding=1)
+        self.maxPool = nn.MaxPool2d(kernel_size=(3,3), stride=2)
+        self.residual1 = Residual(depth, depth)
+        self.residual2 = Residual(depth, depth)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.maxPool(x)
+        x = self.residual1(x)
+        x = self.residual2(x)
+        return x
+
+
 class Encoder(nn.Module):
     def __init__(self, in_channels, feature_dim):
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Conv2d(in_channels=1 if grayscale else in_channels, out_channels=32, kernel_size=8, stride=4), nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2,2), stride=1),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2), nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1), nn.ReLU(),
+            # nn.Conv2d(in_channels=1 if grayscale else in_channels, out_channels=32, kernel_size=8, stride=4), nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=(2,2), stride=1),
+            # nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2), nn.ReLU(),
+            # nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1), nn.ReLU(),
+            ConvSequence(1 if grayscale else in_channels, 16),
+            ConvSequence(16, 32),
+            ConvSequence(32, 32),
             Flatten(),
-            nn.Linear(in_features=1024, out_features=512), nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(in_features=512, out_features=feature_dim)
+            nn.ReLU(),
+            nn.Linear(1568, feature_dim)
+
+            # nn.Linear(in_features=1024, out_features=512), nn.ReLU(),
+            # nn.Dropout(0.1),
+            # nn.Linear(in_features=512, out_features=feature_dim)
         )
         self.apply(orthogonal_init)
 
@@ -105,6 +140,7 @@ if __name__ == "__main__":
     # Run training
     obs = env.reset()
     step = 0
+    max_mean = 0
     while step < total_steps:
 
         # Use policy to collect data for num_steps steps
@@ -173,8 +209,10 @@ if __name__ == "__main__":
         # Update stats
         step += num_envs * num_steps
         print(f'Step: {step}\tMean reward: {storage.get_reward()}')
+        if storage.get_reward() > max_mean:
+            print('New high mean. Updating...')
+            torch.save(policy.state_dict(), 'checkpoint.pt')
+            max_mean = storage.get_reward()
 
     print('Completed training!')
-    torch.save(policy.state_dict(), 'checkpoint.pt')
-    print('Model successfully saved')
 
