@@ -30,7 +30,7 @@ def clamp(num, min_value, max_value):
    return max(min(num, max_value), min_value)
 
 aug_to_func = {
-        # 'crop': data_augs.Crop,
+        'crop': data_augs.Crop,
         'grayscale': data_augs.Grayscale,
         'random-conv': data_augs.RandomConv,
         'flip': data_augs.Flip,
@@ -57,9 +57,6 @@ def select_ucb_aug():
         expl_action[i] = ucb_exploration_coef * \
             np.sqrt(np.log(total_num) / num_action[i])
         ucb_action[i] = qval_action[i] + expl_action[i]
-    print(expl_action)
-    print(qval_action)
-    print(ucb_action)
     ucb_aug_id = np.argmax(ucb_action)
     return ucb_aug_id, aug_list[ucb_aug_id]
 
@@ -182,7 +179,7 @@ if __name__ == "__main__":
     while step < total_steps:
 
         # open a file by creating it as text
-        f = open('data5.txt','a')
+        f = open('data.txt','a')
         
         # Use policy to collect data for num_steps steps
         policy.eval()
@@ -235,14 +232,12 @@ if __name__ == "__main__":
                 new_log_prob = new_dist.log_prob(b_action)
 
                 # Clipped policy objective
-                # pi_loss = self.pi_loss(new_log_prob, b_log_prob, b_advantage, eps)
                 ratio = torch.exp(new_log_prob - b_log_prob)
                 clipped_ratio = ratio.clamp(min=1.0 - eps, max=1.0 + eps)
                 policy_reward = torch.min(ratio * b_advantage, clipped_ratio * b_advantage)
                 pi_loss = -policy_reward.mean()
 
                 # Clipped value function objective
-                # value_loss = self.value_loss(new_value, b_value, b_returns, eps)
                 clipped_value = b_value + (new_value - b_value).clamp(min=-eps, max=eps)
                 vf_loss = torch.max((new_value - b_returns) ** 2, (clipped_value - b_returns) ** 2)
                 value_loss = 0.5 * vf_loss.mean()
@@ -283,7 +278,7 @@ if __name__ == "__main__":
         f.close()
         if storage.get_reward() > max_mean:
             print('New high mean. Updating...')
-            torch.save(policy.state_dict(), 'checkpoint5.pt')
+            torch.save(policy.state_dict(), 'checkpoint.pt')
             max_mean = storage.get_reward()
 
     print('Completed training!')
