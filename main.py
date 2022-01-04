@@ -174,16 +174,14 @@ if __name__ == "__main__":
                 new_log_prob = new_dist.log_prob(b_action)
 
                 # Clipped policy objective
-                # pi_loss = self.pi_loss(new_log_prob, b_log_prob, b_advantage, eps)
                 ratio = torch.exp(new_log_prob - b_log_prob)
                 clipped_ratio = ratio.clamp(min=1.0 - eps, max=1.0 + eps)
                 policy_reward = torch.min(ratio * b_advantage, clipped_ratio * b_advantage)
                 pi_loss = -policy_reward.mean()
 
                 # Clipped value function objective
-                # value_loss = self.value_loss(new_value, b_value, b_returns, eps)
                 clipped_value = b_value + (new_value - b_value).clamp(min=-eps, max=eps)
-                vf_loss = torch.max((new_value - b_value) ** 2, (clipped_value - b_returns) ** 2)
+                vf_loss = torch.max((new_value - b_returns) ** 2, (clipped_value - b_returns) ** 2)
                 value_loss = 0.5 * vf_loss.mean()
 
                 # Entropy loss
